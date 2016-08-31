@@ -7,38 +7,63 @@ import cats.data.Xor.{Left, Right}
 case class Currency(value: String)
 case class Error(value: String)
 
-object Main extends DefaultJsonProtocol with App {
+trait OneFieldFormats {
+
+  // Primitive readers and writers:
 
   implicit def writeString(v: String): JsValue = JsString(v)
-  
+
   implicit def readString(js: JsValue): Xor[Error, String] = js match {
     case JsString(s) => Right(s)
-    case _           => Left(Error(s"That's no string! $js"))
+    case _           => Left(Error(s"Hey! Expected JsString, but given $js"))
   }
 
-  implicit def jsonTinyFormat1[P, VN <: HList, V, X <: HList](implicit 
-    gen    : Generic.Aux[P, VN],
-    ev     : IsHCons.Aux[VN, V, X],
-    eve    : (V :: HNil) =:= VN,
-    writer : V => JsValue,
-    reader : JsValue => Xor[Error, V]
+  // Generic method to create formats for case classes with a single field:
+
+  private implicit def makeFormat[
+    P,           // Product type, eg Currency
+    VN <: HList, // Generic representation of P, eg String :: HNil
+    V            // Single value the product, eg String
+    ](implicit
+    gen    : Generic.Aux[P, VN],        // Converter from P to/from VN
+    ev     : IsHCons.Aux[VN, V, HNil],  // Proof VN is V followed by HNil
+    same   : (V :: HNil) =:= VN,        // Proof V :: HNil is the same as VN
+    writer : V => JsValue,              // Writer for V values
+    reader : JsValue => Xor[Error, V]   // Reader of JSON into values of V
   ): JsonFormat[P] =
       new RootJsonFormat[P] {
         override def write(obj: P): JsValue = writer(gen.to(obj).head)
         override def read(json: JsValue): P = reader(json) match {
-          case Right(v)         => gen.from(v :: HNil) 
+          case Right(v)         => gen.from(v :: HNil)
           case Left(Error(msg)) => deserializationError(msg)
         }
       }
 
-  val g = implicitly[Generic[Currency]]
-  val a = implicitly[Generic.Aux[Currency, String :: HNil]]
-  val w = implicitly[String => JsValue]
-  val r = implicitly[JsValue => Xor[Error, String]]
+  // Export some formats:
+  implicit val currencyFormat: JsonFormat[Currency] = makeFormat
+}
 
-  //val fmt: spray.json.JsonFormat[Currency] = jsonTinyFormat1(a,e1,e2,w,r)
+object Main extends DefaultJsonProtocol with OneFieldFormats with App {
 
-  val cf = implicitly[JsonFormat[Currency]]
-  val currencyFormat: spray.json.JsonFormat[Currency] = jsonTinyFormat1
+  def example(c: Currency): String = {
+    val js = c.toJson
+    val c2 = js.convertTo[Currency]
+    s"$c -> ${js.prettyPrint} -> $c2"
+  }
+
+  // Happy example:
+  println(
+    example(Currency("USD"))
+  )
+
+  // Example failure message:
+  case class CompoundClass(currency: Currency, cents: Int)
+  import scala.util.Try
+  implicit val ccFormat = jsonFormat2(CompoundClass)
+  println(
+    Try {
+      """{ "currency": 10, "cents": 10 }""".parseJson.convertTo[CompoundClass]
+    }
+  )
 
 }

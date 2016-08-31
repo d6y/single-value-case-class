@@ -1,7 +1,7 @@
 
 scalaVersion := "2.11.8"
 
-libraryDependencies += "io.spray" %%  "spray-json" % "1.3.2"
+libraryDependencies += "io.spray" %% "spray-json" % "1.3.2"
 
 libraryDependencies += "com.chuusai" %% "shapeless" % "2.3.2"
 
@@ -21,8 +21,6 @@ scalacOptions := Seq(
   "-Yno-adapted-args",
   "-Ywarn-dead-code",
   "-Ywarn-numeric-widen",
-  "-Ywarn-value-discard",
-  "-Xfuture",
-  "-Ywarn-unused-import" // This might not work well. Try it out for now
+  "-Xfuture"
 )
 

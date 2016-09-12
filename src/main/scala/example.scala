@@ -4,8 +4,8 @@ import shapeless.ops.hlist.IsHCons
 import cats.data.Xor
 import cats.data.Xor.{Left, Right}
 
-case class Currency(value: String)
-case class Error(value: String)
+case class Currency(value: String) extends AnyVal
+case class Error(value: String) extends AnyVal
 
 trait OneFieldFormats {
 
@@ -61,6 +61,7 @@ object Main extends DefaultJsonProtocol with OneFieldFormats with App {
   import scala.util.Try
   implicit val ccFormat = jsonFormat2(CompoundClass)
   println(
+    // Expect failure as currency should be a String such as USD not an integer
     Try {
       """{ "currency": 10, "cents": 10 }""".parseJson.convertTo[CompoundClass]
     }
